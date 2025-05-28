@@ -6,7 +6,7 @@ import numpy as np
 
 # Configuración desde archivo local
 # IMPORTANTE: Asegúrate de que INFLUX_URL, INFLUX_TOKEN, ORG y BUCKET en 'config.py'
-# sean los correctos para tu proyecto de Microcultivos (BUCKET debería ser "homeiot" [cite: 37]).
+# sean los correctos para tu proyecto de Microcultivos (BUCKET debería ser "homeiot").
 # Si no es así, y no puedes cambiar config.py, deberías redefinir BUCKET aquí:
 # BUCKET = "homeiot" # Descomenta y ajusta si es necesario.
 from config import INFLUX_URL, INFLUX_TOKEN, ORG, BUCKET
@@ -69,9 +69,9 @@ st.markdown("Monitorea en tiempo real los datos ambientales de tus microcultivos
 range_minutes = st.slider("Selecciona el rango de tiempo (en minutos):", 10, 180, 60)
 
 # Consultas de datos desde InfluxDB
-temp_df = query_data("airSensor", "temperature", range_minutes) # [cite: 11, 37]
-hum_df = query_data("airSensor", "humidity", range_minutes) # [cite: 11, 37]
-uv_df = query_data("uv_sensor", "uv_index", range_minutes) # [cite: 11, 38] (asumiendo que quieres uv_index aquí)
+temp_df = query_data("airSensor", "temperature", range_minutes) 
+hum_df = query_data("airSensor", "humidity", range_minutes) 
+uv_df = query_data("uv_sensor", "uv_index", range_minutes) 
 
 st.subheader("📈 Visualización de Datos Recientes (Streamlit)")
 
@@ -100,7 +100,7 @@ with col3:
         st.info("Sin datos de UV en este rango.")
 
 # Análisis Estadísticos
-st.subheader("📊 Análisis Estadístico (últimos " + str(range_minutes) + " minutos)") # [cite: 18]
+st.subheader("📊 Análisis Estadístico (últimos " + str(range_minutes) + " minutos)") 
 
 if not temp_df.empty:
     st.write("Temperatura:")
@@ -123,14 +123,16 @@ else:
 if not uv_df.empty:
     st.write("Índice UV:")
     col_stats_uv1, col_stats_uv2, col_stats_uv3 = st.columns(3)
-    col_stats_uv1.metric("Mínimo", f"{uv_df['uv_index'].min():.2f}")
+    # ----- INICIO DE LA CORRECCIÓN -----
+    col_stats_uv1.metric("Mínimo", f"{uv_df['uv_index'].min():.2f}") 
+    # ----- FIN DE LA CORRECCIÓN -----
     col_stats_uv2.metric("Máximo", f"{uv_df['uv_index'].max():.2f}")
     col_stats_uv3.metric("Promedio", f"{uv_df['uv_index'].mean():.2f}")
 else:
     st.write("Índice UV: Sin datos para análisis.")
 
 # Recomendaciones Automatizadas
-st.subheader("💡 Recomendaciones Automatizadas") # [cite: 19]
+st.subheader("💡 Recomendaciones Automatizadas") 
 
 # Umbrales (ejemplos, ajusta según el tipo de cultivo)
 HUMIDITY_LOW_THRESHOLD = 40
@@ -141,14 +143,14 @@ recommendations = []
 if not hum_df.empty:
     last_humidity = hum_df['humidity'].iloc[-1] if not hum_df.empty else None
     if last_humidity is not None and last_humidity < HUMIDITY_LOW_THRESHOLD:
-        recommendations.append(f"💧 Humedad baja ({last_humidity:.1f}%). Considera regar tus cultivos.") # [cite: 19]
+        recommendations.append(f"💧 Humedad baja ({last_humidity:.1f}%). Considera regar tus cultivos.") 
 else:
     recommendations.append("💧 No hay datos recientes de humedad para generar recomendaciones de riego.")
 
 if not uv_df.empty:
     last_uv = uv_df['uv_index'].iloc[-1] if not uv_df.empty else None
     if last_uv is not None and last_uv > UV_HIGH_THRESHOLD:
-        recommendations.append(f"☀️ Radiación UV alta ({last_uv:.1f}). Considera proteger tus cultivos con sombra.") # [cite: 19]
+        recommendations.append(f"☀️ Radiación UV alta ({last_uv:.1f}). Considera proteger tus cultivos con sombra.") 
 else:
     recommendations.append("☀️ No hay datos recientes de UV para generar recomendaciones de protección solar.")
 
@@ -166,7 +168,6 @@ st.subheader("🖼️ Visualizaciones Específicas desde Grafana")
 
 # 1. Panel de Grafana: Heat Index
 st.markdown("#### Índice de Calor (desde Grafana)")
-# REEMPLAZA LA SIGUIENTE URL con la URL de iframe de tu panel de Grafana para "Heat Index"
 URL_GRAFANA_HEAT_INDEX_IFRAME = "https://santianchez05.grafana.net/d-solo/09ff8bd6-e9d7-4852-9bc7-c7ae01600f54/humidity-vs-temperature?orgId=1&from=1747325219746&to=1747368419746&timezone=browser&panelId=3&__feature.dashboardSceneSolo=true"
 if URL_GRAFANA_HEAT_INDEX_IFRAME != "URL_DE_IFRAME_PARA_HEAT_INDEX_AQUI":
     st.components.v1.iframe(URL_GRAFANA_HEAT_INDEX_IFRAME, height=300, scrolling=True)
@@ -175,7 +176,6 @@ else:
 
 # 2. Panel de Grafana: Humidity Heatmap
 st.markdown("#### Mapa de Calor de Humedad (desde Grafana)")
-# REEMPLAZA LA SIGUIENTE URL con la URL de iframe de tu panel de Grafana para "Humidity Heatmap"
 URL_GRAFANA_HUMIDITY_HEATMAP_IFRAME = "https://santianchez05.grafana.net/d-solo/09ff8bd6-e9d7-4852-9bc7-c7ae01600f54/humidity-vs-temperature?orgId=1&from=1747325219746&to=1747368419746&timezone=browser&panelId=6&__feature.dashboardSceneSolo=true"
 if URL_GRAFANA_HUMIDITY_HEATMAP_IFRAME != "URL_DE_IFRAME_PARA_HUMIDITY_HEATMAP_AQUI":
     st.components.v1.iframe(URL_GRAFANA_HUMIDITY_HEATMAP_IFRAME, height=300, scrolling=True)
@@ -193,7 +193,5 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-# La línea IMPORTANTE de comentario ya no es necesaria aquí porque has puesto la URL.
 
-# st.markdown("https://santianchez05.grafana.net/goto/Z3DSlcfNR?orgId=1") # ESTA LÍNEA DEBES ELIMINARLA
 st.caption("Proyecto Integrador - Computación Física e IoT")
