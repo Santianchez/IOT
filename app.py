@@ -11,26 +11,6 @@ import numpy as np
 # BUCKET = "homeiot" # Descomenta y ajusta si es necesario.
 from config import INFLUX_URL, INFLUX_TOKEN, ORG, BUCKET
 
-# Función para consultar múltiples campos de un mismo measurement (actualmente no usada, podrías eliminarla si no la necesitas más)
-# def query_accelerometer_data(range_minutes=60):
-#     client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=ORG)
-#     query_api = client.query_api()
-#     query = f'''
-#     import "math"
-#     from(bucket: "{BUCKET}")
-#       |> range(start: -{range_minutes}m)
-#       |> filter(fn: (r) => r["_measurement"] == "accelerometer" and r["_field"] == "ax" or r["_field"] == "ay" or r["_field"] == "az")
-#       |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-#       |> sort(columns: ["_time"])
-#     '''
-#     result = query_api.query_data_frame(query)
-#     if result.empty:
-#         return pd.DataFrame()
-#     result = result.rename(columns={"_time": "time"})
-#     result["accel_magnitude"] = np.sqrt(result["ax"]**2 + result["ay"]**2 + result["az"]**2)
-#     result["time"] = pd.to_datetime(result["time"])
-#     return result[["time", "accel_magnitude"]]
-
 # Consulta simple de un solo campo
 def query_data(measurement, field, range_minutes=60):
     client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=ORG)
@@ -43,21 +23,23 @@ def query_data(measurement, field, range_minutes=60):
       |> sort(columns: ["_time"])
     '''
 
-    result = query_api.query(query) # Usamos query() para procesar manualmente y asegurar conversión de tiempo
+    result = query_api.query(query)
     data = []
 
     for table in result:
         for record in table.records:
-            data.append({"time": record.get_time(), field: record.get_value()})
+            # Asegurarse de que el record no sea None y tenga los atributos esperados
+            if record and record.get_time() and record.get_value() is not None:
+                data.append({"time": record.get_time(), field: record.get_value()})
     
     df = pd.DataFrame(data)
     if not df.empty:
-        # Asegurarse de que 'time' sea datetime y esté localizado en UTC, luego convertir a local si es necesario
+        # Asegurarse de que 'time' sea datetime y esté localizado en UTC
         df["time"] = pd.to_datetime(df["time"])
         if df["time"].dt.tz is None:
             df["time"] = df["time"].dt.tz_localize('UTC') # Asumir UTC si no tiene timezone
         # Puedes convertirlo a tu timezone local para mostrar si lo deseas, ej:
-        # df["time"] = df["time"].dt.tz_convert('America/Bogota') 
+        # df["time"] = df["time"].dt.tz_convert('America/Bogota')  
     return df
 
 # Configuración de la app
@@ -69,9 +51,9 @@ st.markdown("Monitorea en tiempo real los datos ambientales de tus microcultivos
 range_minutes = st.slider("Selecciona el rango de tiempo (en minutos):", 10, 180, 60)
 
 # Consultas de datos desde InfluxDB
-temp_df = query_data("airSensor", "temperature", range_minutes) 
-hum_df = query_data("airSensor", "humidity", range_minutes) 
-uv_df = query_data("uv_sensor", "uv_index", range_minutes) 
+temp_df = query_data("airSensor", "temperature", range_minutes)  
+hum_df = query_data("airSensor", "humidity", range_minutes)  
+uv_df = query_data("uv_sensor", "uv_index", range_minutes)  
 
 st.subheader("📈 Visualización de Datos Recientes (Streamlit)")
 
@@ -100,7 +82,7 @@ with col3:
         st.info("Sin datos de UV en este rango.")
 
 # Análisis Estadísticos
-st.subheader("📊 Análisis Estadístico (últimos " + str(range_minutes) + " minutos)") 
+st.subheader("📊 Análisis Estadístico (últimos " + str(range_minutes) + " minutos)")  
 
 if not temp_df.empty:
     st.write("Temperatura:")
@@ -123,16 +105,14 @@ else:
 if not uv_df.empty:
     st.write("Índice UV:")
     col_stats_uv1, col_stats_uv2, col_stats_uv3 = st.columns(3)
-    # ----- INICIO DE LA CORRECCIÓN -----
-    col_stats_uv1.metric("Mínimo", f"{uv_df['uv_index'].min():.2f}") 
-    # ----- FIN DE LA CORRECCIÓN -----
+    col_stats_uv1.metric("Mínimo", f"{uv_df['uv_index'].min():.2f}")  
     col_stats_uv2.metric("Máximo", f"{uv_df['uv_index'].max():.2f}")
     col_stats_uv3.metric("Promedio", f"{uv_df['uv_index'].mean():.2f}")
 else:
     st.write("Índice UV: Sin datos para análisis.")
 
 # Recomendaciones Automatizadas
-st.subheader("💡 Recomendaciones Automatizadas") 
+st.subheader("💡 Recomendaciones Automatizadas")  
 
 # Umbrales (ejemplos, ajusta según el tipo de cultivo)
 HUMIDITY_LOW_THRESHOLD = 40
@@ -141,16 +121,16 @@ UV_HIGH_THRESHOLD = 6
 recommendations = []
 
 if not hum_df.empty:
-    last_humidity = hum_df['humidity'].iloc[-1] if not hum_df.empty else None
-    if last_humidity is not None and last_humidity < HUMIDITY_LOW_THRESHOLD:
-        recommendations.append(f"💧 Humedad baja ({last_humidity:.1f}%). Considera regar tus cultivos.") 
+    last_humidity = hum_df['humidity'].iloc[-1]
+    if last_humidity < HUMIDITY_LOW_THRESHOLD:
+        recommendations.append(f"💧 Humedad baja ({last_humidity:.1f}%). Considera regar tus cultivos.")  
 else:
     recommendations.append("💧 No hay datos recientes de humedad para generar recomendaciones de riego.")
 
 if not uv_df.empty:
-    last_uv = uv_df['uv_index'].iloc[-1] if not uv_df.empty else None
-    if last_uv is not None and last_uv > UV_HIGH_THRESHOLD:
-        recommendations.append(f"☀️ Radiación UV alta ({last_uv:.1f}). Considera proteger tus cultivos con sombra.") 
+    last_uv = uv_df['uv_index'].iloc[-1]
+    if last_uv > UV_HIGH_THRESHOLD:
+        recommendations.append(f"☀️ Radiación UV alta ({last_uv:.1f}). Considera proteger tus cultivos con sombra.")  
 else:
     recommendations.append("☀️ No hay datos recientes de UV para generar recomendaciones de protección solar.")
 
@@ -169,7 +149,7 @@ st.subheader("🖼️ Visualizaciones Específicas desde Grafana")
 # 1. Panel de Grafana: Heat Index
 st.markdown("#### Índice de Calor (desde Grafana)")
 URL_GRAFANA_HEAT_INDEX_IFRAME = "https://santianchez05.grafana.net/d-solo/09ff8bd6-e9d7-4852-9bc7-c7ae01600f54/humidity-vs-temperature?orgId=1&from=1747325219746&to=1747368419746&timezone=browser&panelId=3&__feature.dashboardSceneSolo=true"
-if URL_GRAFANA_HEAT_INDEX_IFRAME != "URL_DE_IFRAME_PARA_HEAT_INDEX_AQUI":
+if URL_GRAFANA_HEAT_INDEX_IFRAME != "URL_DE_IFRAME_PARA_HEAT_INDEX_AQUI": # Este es un placeholder, asumo que ya lo has cambiado
     st.components.v1.iframe(URL_GRAFANA_HEAT_INDEX_IFRAME, height=300, scrolling=True)
 else:
     st.warning("Por favor, configura la URL del iframe para el panel 'Heat Index' de Grafana.")
@@ -177,7 +157,7 @@ else:
 # 2. Panel de Grafana: Humidity Heatmap
 st.markdown("#### Mapa de Calor de Humedad (desde Grafana)")
 URL_GRAFANA_HUMIDITY_HEATMAP_IFRAME = "https://santianchez05.grafana.net/d-solo/09ff8bd6-e9d7-4852-9bc7-c7ae01600f54/humidity-vs-temperature?orgId=1&from=1747325219746&to=1747368419746&timezone=browser&panelId=6&__feature.dashboardSceneSolo=true"
-if URL_GRAFANA_HUMIDITY_HEATMAP_IFRAME != "URL_DE_IFRAME_PARA_HUMIDITY_HEATMAP_AQUI":
+if URL_GRAFANA_HUMIDITY_HEATMAP_IFRAME != "URL_DE_IFRAME_PARA_HUMIDITY_HEATMAP_AQUI": # Este es un placeholder, asumo que ya lo has cambiado
     st.components.v1.iframe(URL_GRAFANA_HUMIDITY_HEATMAP_IFRAME, height=300, scrolling=True)
 else:
     st.warning("Por favor, configura la URL del iframe para el panel 'Humidity Heatmap' de Grafana.")
@@ -185,7 +165,7 @@ else:
 # --- FIN SECCIÓN PANELES GRAFANA ---
 
 # Enlace al Dashboard Completo de Grafana
-st.subheader("🔗 Acceso al Dashboard Completo en Grafana") 
+st.subheader("🔗 Acceso al Dashboard Completo en Grafana")  
 st.markdown(
     """
     Para un análisis más detallado y todas las visualizaciones interactivas, puedes acceder al dashboard completo en Grafana.
